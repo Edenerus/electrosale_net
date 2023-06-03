@@ -4,6 +4,6 @@ python manage.py migrate --check
 status=$?
 # shellcheck disable=SC2050
 if [[ status != 0 ]]; then
-  python manage.py migrate
+  python ./manage.py migrate
 fi
 exec "$@"

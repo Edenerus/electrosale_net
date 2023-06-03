@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 
 
 class Product(models.Model):
@@ -26,6 +27,7 @@ class Provider(models.Model):
 
     title = models.CharField(max_length=50, unique=True, verbose_name='Название')
     type = models.PositiveSmallIntegerField(choices=Types.choices, default=0, verbose_name='Тип звена')
+    level = models.SmallIntegerField(verbose_name='Уровень звена сети', default=0)
 
     # contacts
     email = models.EmailField(unique=True, verbose_name='Email')
@@ -39,7 +41,28 @@ class Provider(models.Model):
     provider = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True,
                                  verbose_name='Поставщик', related_name='supplier')
     debt = models.DecimalField(default=0, decimal_places=2, max_digits=10, verbose_name='Задолженность')
-    create_date = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    create_date = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания', editable=False)
+
+    def save(self, *args, **kwargs):
+        """Определение уровня звена сети"""
+        if not self.provider:
+            self.level = 0
+
+        else:
+            self.level = self.provider.level + 1
+
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        """Проверка нужна для того, чтобы узнать, может ли объект иметь поставщика
+            Т.к Завод всегда находится в уровне сети 0, то у него не может быть поставщиков
+            Если потенциальный поставщик уже находится на уровне сети 2(т.е у него есть поставщик, у которого тоже свой
+            поставщик), то он не может быть поставщиком для объекта
+            В обоих случаях при неполадках выпадает сообщение"""
+        if self.type == 0 and self.provider:
+            raise ValidationError(f"{self} является заводом и не может иметь поставщиков")
+        if self.provider.level == 2:
+            raise ValidationError(f"{self.provider} не может быть поставщиком для {self}, т.к его уровень сети 2 ")
 
     def __str__(self):
         return self.title
